@@ -20,9 +20,6 @@ function App() {
   const [usernameDialogOpen, setUsernameDialogOpen] = React.useState(true);
   const [onlineUsers, setOnlineUsers] = React.useState([]);
   const socketRef = useRef();
-  const [localStream, setLocalStream] = React.useState(null);
-  const [remoteStream, setRemoteStream] = React.useState(null);
-  const peerRef = useRef();
 
   useEffect(() => {
     socketRef.current = io('http://localhost:5000');
@@ -152,58 +149,3 @@ function App() {
 }
 
 export default App;
-
-const startCall = async () => {
-  const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-  setLocalStream(stream);
-  peerRef.current = new RTCPeerConnection();
-  stream.getTracks().forEach(track => peerRef.current.addTrack(track, stream));
-  peerRef.current.onicecandidate = (e) => {
-    if (e.candidate) {
-      socketRef.current.emit('ice-candidate', { to: selectedPerson, candidate: e.candidate });
-    }
-  };
-  peerRef.current.ontrack = (e) => {
-    setRemoteStream(e.streams[0]);
-  };
-  const offer = await peerRef.current.createOffer();
-  await peerRef.current.setLocalDescription(offer);
-  socketRef.current.emit('video-offer', { to: selectedPerson, offer });
-};
-
-// Listen for signaling events from server (add in useEffect)
-socketRef.current.on('video-offer', async (data) => {
-  const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-  setLocalStream(stream);
-  peerRef.current = new RTCPeerConnection();
-  stream.getTracks().forEach(track => peerRef.current.addTrack(track, stream));
-  peerRef.current.onicecandidate = (e) => {
-    if (e.candidate) {
-      socketRef.current.emit('ice-candidate', { to: data.from, candidate: e.candidate });
-    }
-  };
-  peerRef.current.ontrack = (e) => {
-    setRemoteStream(e.streams[0]);
-  };
-  await peerRef.current.setRemoteDescription(new RTCSessionDescription(data.offer));
-  const answer = await peerRef.current.createAnswer();
-  await peerRef.current.setLocalDescription(answer);
-  socketRef.current.emit('video-answer', { to: data.from, answer });
-});
-socketRef.current.on('video-answer', async (data) => {
-  await peerRef.current.setRemoteDescription(new RTCSessionDescription(data.answer));
-});
-socketRef.current.on('ice-candidate', async (data) => {
-  try {
-    await peerRef.current.addIceCandidate(new RTCIceCandidate(data.candidate));
-  } catch (e) {}
-});
-
-// Add video elements to render local and remote streams
-{localStream && (
-  <video autoPlay playsInline muted ref={video => video && (video.srcObject = localStream)} style={{ width: 200 }} />
-)}
-{remoteStream && (
-  <video autoPlay playsInline ref={video => video && (video.srcObject = remoteStream)} style={{ width: 200 }} />
-)}
-<Button onClick={startCall} disabled={!selectedPerson}>Start Video Call</Button>
