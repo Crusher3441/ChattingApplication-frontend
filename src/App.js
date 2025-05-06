@@ -22,7 +22,7 @@ function App() {
   const socketRef = useRef();
 
   useEffect(() => {
-    socketRef.current = io('http://localhost:5000');
+    socketRef.current = io('https://chattingapplication-pe74.onrender.com/');
     socketRef.current.on('users', (users) => {
       setOnlineUsers(users);
     });
